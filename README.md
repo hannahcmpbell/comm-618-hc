@@ -4,4 +4,4 @@
 
 ### This is H3
 
-Here's my link [Link Text](#Link)
+Here's my link [Link](#Link)
