@@ -1,0 +1,693 @@
+---
+title: "2_25"
+author: "Aarushi Sahejpal"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Lesson**
+
+```{r}
+
+# ---- Step 1: Load necessary libraries ----
+# Install packages if you don't have them already
+# install.packages(c("tidyverse", "lubridate", "scales", "knitr"))
+
+library(tidyverse)     # For data manipulation and visualization
+library(lubridate)     # For handling dates
+library(scales)        # For better axis formatting
+library(knitr)         # For nice tables
+
+# ---- Step 2: Import the data ----
+# Set your working directory to where the file is located
+# setwd("your/path/here")
+
+# Import the CSV file
+violations <- read_csv("landlord_violations.csv")
+```
+
+```{r}
+# group by 
+# count
+# Median and mean
+# more aggregates
+```
+
+
+**Explore first**
+
+```{r}
+
+
+# ---- Step 3: Basic data exploration ----
+# Look at the dimensions of the dataset
+summary(violations) # Shows number of rows and columns
+
+# Look at the structure of the data
+str(violations)
+
+# View the first few rows
+head(violations)
+
+# View the last few rows
+tail(violations)
+
+```
+
+```{r}
+
+# Get column names
+colnames(violations)
+
+# Count total number of rows
+cat("Total number of violations:", nrow(violations), "\n")
+
+# Count unique values in key columns
+cat("Number of unique landlords:", n_distinct(violations$OWNER, na.rm = TRUE), "\n")
+cat("Number of unique addresses:", n_distinct(violations$`VIOLATION ADDRESS`, na.rm = TRUE), "\n")
+cat("Number of unique violation types:", n_distinct(violations$VIOLATION, na.rm = TRUE), "\n")
+
+# Basic counts by category
+cat("\nViolations by floor:\n")
+print(table(violations$FLOOR))
+
+cat("\nViolations by location:\n")
+head(sort(table(violations$LOCATION), decreasing = TRUE), 10)
+
+# Check for missing values in each column
+cat("\nNumber of missing values by column:\n")
+colSums(is.na(violations))
+
+# Get a sense of the time range
+if(is.character(violations$`CREATED DATE`)) {
+  # Convert to Date format for this calculation
+  date_col <- as.Date(violations$`CREATED DATE`, format="%m/%d/%Y")
+  cat("\nDate range of violations:", min(date_col, na.rm = TRUE), "to", max(date_col, na.rm = TRUE), "\n")
+}
+
+# Initial exploration of fine amounts
+if(grepl("\\$", violations$`ORIGINAL FINE AMOUNT`[1])) {
+  # Convert to numeric for this calculation
+  fine_col <- as.numeric(gsub("\\$|,", "", violations$`ORIGINAL FINE AMOUNT`))
+  
+  cat("\nFine amount summary:\n")
+  cat("Min:", min(fine_col, na.rm = TRUE), "\n")
+  cat("Max:", max(fine_col, na.rm = TRUE), "\n")
+  cat("Mean:", mean(fine_col, na.rm = TRUE), "\n")
+  cat("Median:", median(fine_col, na.rm = TRUE), "\n")
+  
+  # Create a simple histogram of fine amounts
+  hist(fine_col, main = "Distribution of Fine Amounts", 
+       xlab = "Fine Amount ($)", col = "lightblue", breaks = 20)
+}
+
+# Group by OWNER and summarize
+owner_summary <- violations %>%
+  group_by(OWNER) %>%
+  summarise(
+    count = n(),
+    avg_fine = mean(as.numeric(gsub("\\$|,", "", `ORIGINAL FINE AMOUNT`)), na.rm = TRUE),
+    min_fine = min(as.numeric(gsub("\\$|,", "", `ORIGINAL FINE AMOUNT`)), na.rm = TRUE),
+    max_fine = max(as.numeric(gsub("\\$|,", "", `ORIGINAL FINE AMOUNT`)), na.rm = TRUE)
+  ) %>%
+  arrange(desc(count))
+
+# Print top landlords by violation count
+cat("\nTop 10 landlords by violation count:\n")
+print(head(owner_summary, 10))
+
+# Group by location and summarize
+location_summary <- violations %>%
+  group_by(LOCATION) %>%
+  summarise(
+    count = n(),
+    avg_fine = mean(as.numeric(gsub("\\$|,", "", `ORIGINAL FINE AMOUNT`)), na.rm = TRUE)
+  ) %>%
+  arrange(desc(count))
+
+# Print top locations by violation count
+cat("\nTop 10 locations by violation count:\n")
+print(head(location_summary, 10))
+
+# ---- Step 4: Data cleaning and preparation ----
+# Convert date column to Date type
+violations <- violations %>%
+  mutate(CREATED_DATE = mdy(`CREATED DATE`))
+
+# Convert fine amount to numeric
+violations <- violations %>%
+  mutate(FINE_AMOUNT = as.numeric(gsub("\\$|,", "", `ORIGINAL FINE AMOUNT`)))
+
+# Look at missing values
+missing_values <- violations %>%
+  summarise(across(everything(), ~sum(is.na(.)))) %>%
+  pivot_longer(cols = everything(), 
+               names_to = "Column", 
+               values_to = "Missing_Count")
+
+print(missing_values)
+
+# ---- Step 5: Basic exploratory analysis ----
+# 1. Distribution of violations by location
+location_counts <- violations %>%
+  count(LOCATION, sort = TRUE) %>%
+  top_n(10)
+
+# Create a bar chart for top 10 locations
+ggplot(location_counts, aes(x = reorder(LOCATION, n), y = n)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top 10 Violation Locations",
+       x = "Location",
+       y = "Number of Violations") +
+  theme_minimal()
+
+# 2. Distribution of fine amounts
+ggplot(violations, aes(x = FINE_AMOUNT)) +
+  geom_histogram(bins = 20, fill = "coral") +
+  scale_x_continuous(labels = dollar_format()) +
+  labs(title = "Distribution of Fine Amounts",
+       x = "Fine Amount ($)",
+       y = "Count") +
+  theme_minimal()
+
+# 3. Violations over time
+violations_by_date <- violations %>%
+  count(CREATED_DATE) 
+
+ggplot(violations_by_date, aes(x = CREATED_DATE, y = n)) +
+  geom_line() +
+  labs(title = "Number of Violations Over Time",
+       x = "Date",
+       y = "Number of Violations") +
+  theme_minimal()
+
+# ---- Step 6: Analyze top landlords with violations ----
+top_landlords <- violations %>%
+  count(OWNER, sort = TRUE) %>%
+  filter(!is.na(OWNER)) %>%
+  top_n(10)
+
+ggplot(top_landlords, aes(x = reorder(OWNER, n), y = n)) +
+  geom_bar(stat = "identity", fill = "darkgreen") +
+  coord_flip() +
+  labs(title = "Top 10 Landlords by Number of Violations",
+       x = "Landlord",
+       y = "Number of Violations") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 8))  # Make text smaller to fit
+
+# ---- Step 7: Analyze violation types ----
+# Extract the main violation type from the detailed violation text
+violations <- violations %>%
+  mutate(VIOLATION_TYPE = str_extract(VIOLATION, "^[^|]+"))
+
+# Count the top violation types
+top_violations <- violations %>%
+  count(VIOLATION_TYPE, sort = TRUE) %>%
+  top_n(10)
+
+ggplot(top_violations, aes(x = reorder(VIOLATION_TYPE, n), y = n)) +
+  geom_bar(stat = "identity", fill = "purple") +
+  coord_flip() +
+  labs(title = "Top 10 Violation Types",
+       x = "Violation Type",
+       y = "Count") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 8))  # Make text smaller to fit
+
+# ---- Step 8: Analyze fine amounts by violation type ----
+fine_by_violation <- violations %>%
+  group_by(VIOLATION_TYPE) %>%
+  summarise(
+    avg_fine = mean(FINE_AMOUNT, na.rm = TRUE),
+    total_fine = sum(FINE_AMOUNT, na.rm = TRUE),
+    count = n()
+  ) %>%
+  arrange(desc(avg_fine)) %>%
+  filter(count > 10)  # Only include violation types with more than 10 occurrences
+
+# Show top 10 violations by average fine
+top_10_by_fine <- head(fine_by_violation, 10)
+kable(top_10_by_fine)
+
+# Create a scatter plot showing relationship between violation count and average fine
+ggplot(fine_by_violation, aes(x = count, y = avg_fine)) +
+  geom_point(aes(size = total_fine), alpha = 0.7, color = "blue") +
+  scale_y_continuous(labels = dollar_format()) +
+  scale_size_continuous(name = "Total Fines", labels = dollar_format()) +
+  labs(title = "Violation Count vs. Average Fine Amount",
+       x = "Number of Violations",
+       y = "Average Fine Amount ($)") +
+  theme_minimal()
+
+# ---- Step 9: Geographic analysis ----
+# Extract street names from violation addresses
+violations <- violations %>%
+  mutate(STREET = str_extract(`VIOLATION ADDRESS`, "[A-Z]+ (ST|AVE|BLVD|RD|DR|LN|CT|PL|WAY|TER|CIR)"))
+
+# Count violations by street
+street_counts <- violations %>%
+  count(STREET, sort = TRUE) %>%
+  filter(!is.na(STREET)) %>%
+  top_n(15)
+
+ggplot(street_counts, aes(x = reorder(STREET, n), y = n)) +
+  geom_bar(stat = "identity", fill = "orange") +
+  coord_flip() +
+  labs(title = "Top 15 Streets with Most Violations",
+       x = "Street",
+       y = "Number of Violations") +
+  theme_minimal()
+
+
+# ---- Step 12: Seasonal patterns in violations ----
+violations <- violations %>%
+  mutate(month = month(CREATED_DATE),
+         month_name = month(CREATED_DATE, label = TRUE))
+
+monthly_counts <- violations %>%
+  count(month, month_name)
+
+ggplot(monthly_counts, aes(x = month_name, y = n, group = 1)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Violations by Month",
+       x = "Month",
+       y = "Number of Violations") +
+  theme_minimal()
+
+# ---- Step 13: Create a summary report ----
+# Calculate key statistics
+total_violations <- nrow(violations)
+total_landlords <- n_distinct(violations$OWNER, na.rm = TRUE)
+total_addresses <- n_distinct(violations$`VIOLATION ADDRESS`, na.rm = TRUE)
+avg_fine <- mean(violations$FINE_AMOUNT, na.rm = TRUE)
+max_fine <- max(violations$FINE_AMOUNT, na.rm = TRUE)
+
+# Print summary statistics
+cat("Summary of DC Landlord Violations:\n")
+cat("Total Violations:", total_violations, "\n")
+cat("Total Unique Landlords:", total_landlords, "\n")
+cat("Total Unique Addresses:", total_addresses, "\n")
+cat("Average Fine Amount: $", round(avg_fine, 2), "\n")
+cat("Maximum Fine Amount: $", max_fine, "\n")
+
+```
+
+**Re-create story findings.**
+
+1.  As of Aug. 1, 2024, the owners of 3003 Van Ness St. NW owed the District more than `$1.2 million` in unpaid fees for more than 700 violations since 2018, the most of any residential building in D.C during that time frame. That amount dropped significantly after reporters began asking questions in recent months, and as of Jan. 15, 2025, the amount of housing code fines totaled `$182,000` for 139 violations.
+2.  The remaining `$182,000` in unpaid fines at the Van Ness property is just a sliver of the more than `$40 million` in unpaid fees amassed by landlords across the District since 2018, according to a new analysis conducted by the *Investigative Reporting Workshop*.
+
+
+**Create a bar chart of top landlords by fine amounts **
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(lubridate)
+
+# Read the CSV file into a data frame
+violations_data <- read.csv("landlord_violations.csv")
+
+# Convert 'CREATED DATE' column to Date type if it's not already
+violations_data$CREATED.DATE <- as.Date(violations_data$CREATED.DATE, format = "%Y-%m-%d")
+
+# Filter the data for violations at '3003 VAN NESS ST NW' between 2018 and 1 Aug 2024
+start_date <- as.Date("2018-01-01")
+end_date <- as.Date("2024-08-01")
+
+filtered_data <- violations_data %>%
+  filter(VIOLATION.ADDRESS == "3003 VAN NESS ST NW" &
+           CREATED.DATE >= start_date &
+           CREATED.DATE <= end_date)
+
+# Count the number of violations
+violation_count <- nrow(filtered_data)
+
+# Output the result
+print(paste("Number of violations at 3003 VAN NESS ST NW between 2018 and 1 Aug 2024:", violation_count))
+
+```
+Code didn't work as it says 0, trying to check it 
+```{r}
+head(violations_data$CREATED.DATE)
+
+```
+```{r}
+head(violations_data$CREATED.DATE)
+
+```
+```{r}
+violations_data$CREATED.DATE <- as.Date(violations_data$CREATED.DATE, format = "%m/%d/%Y")
+```
+
+
+```{r}
+head(violations_data$CREATED.DATE)
+```
+```{r}
+# Find rows where the date conversion failed
+invalid_dates <- violations_data[is.na(violations_data$CREATED.DATE), ]
+head(invalid_dates)
+
+```
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(lubridate)
+
+# Read the CSV file into a data frame
+violations_data <- read.csv("1.Detail Landlord Violations.xlsx - Sheet 1.csv")
+
+# Clean up the address column (remove leading/trailing spaces)
+violations_data$VIOLATION.ADDRESS <- trimws(violations_data$VIOLATION.ADDRESS)
+
+# Convert 'CREATED DATE' column to Date type if it's not already
+violations_data$CREATED.DATE <- as.Date(violations_data$CREATED.DATE, format = "%m/%d/%Y")  # Adjust format if necessary
+
+# Check column names and inspect some data
+colnames(violations_data)
+head(violations_data$CREATED.DATE)
+head(violations_data$VIOLATION.ADDRESS)
+
+# Filter the data for violations at '3003 VAN NESS ST NW' between 2018 and 1 Aug 2024
+start_date <- as.Date("2018-01-01")
+end_date <- as.Date("2024-08-01")
+
+filtered_data <- violations_data %>%
+  filter(VIOLATION.ADDRESS == "3003 VAN NESS ST NW" &
+         CREATED.DATE >= start_date &
+         CREATED.DATE <= end_date)
+
+# Count the number of violations
+violation_count <- nrow(filtered_data)
+
+# Output the result
+print(paste("Number of violations at 3003 VAN NESS ST NW between 2018 and 1 Aug 2024:", violation_count))
+
+```
+```{r}
+# Load necessary libraries
+library(dplyr)
+
+# Load the data from the CSV file
+data <- read.csv("1.Detail Landlord Violations.csv")
+
+# Count how many times '3003 VAN NESS ST NW' appears in the 'VIOLATION ADDRESS' column
+count_violations <- data %>%
+  filter(`VIOLATION ADDRESS` == "3003 VAN NESS ST NW") %>%
+  nrow()
+
+# Print the result
+print(count_violations)
+
+```
+```{r}
+# Load necessary libraries
+library(readxl)
+library(dplyr)
+
+# Load the data from the Excel file
+data <- read_excel("1.Detail Landlord Violations.xlsx", sheet = "Sheet 1")
+
+# Count how many times '3003 VAN NESS ST NW' appears in the 'VIOLATION ADDRESS' column
+count_violations <- data %>%
+  filter(`VIOLATION ADDRESS` == "3003 VAN NESS ST NW") %>%
+  nrow()
+
+# Print the result
+print(count_violations)
+
+```
+```{r}
+# Load necessary libraries
+library(dplyr)
+
+# Load the data from the CSV file using the full path
+data <- read.csv("~/Uni/MA Journalism/Learn R/1.Detail Landlord Violations.xlsx - Sheet 1.csv")
+
+# Count how many times '3003 VAN NESS ST NW' appears in the 'VIOLATION ADDRESS' column
+count_violations <- data %>%
+  filter(`VIOLATION ADDRESS` == "3003 VAN NESS ST NW") %>%
+  nrow()
+
+# Print the result
+print(count_violations)
+
+```
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+
+# Load the data from the CSV file
+data <- read.csv("~/Uni/MA Journalism/Learn R/1.Detail Landlord Violations.xlsx - Sheet 1.csv")
+
+# Print column names to check
+colnames(data)
+
+```
+```{r}
+# Load necessary libraries
+library(dplyr)
+
+# Load the data from the CSV file
+data <- read.csv("~/Uni/MA Journalism/Learn R/1.Detail Landlord Violations.xlsx - Sheet 1.csv")
+
+# Count how many times '3003 VAN NESS ST NW' appears in the 'VIOLATION.ADDRESS' column
+count_violations <- data %>%
+  filter(`VIOLATION.ADDRESS` == "3003 VAN NESS ST NW") %>%
+  nrow()
+
+# Print the result
+print(count_violations)
+
+```
+```{r}
+# Load necessary libraries
+library(dplyr)
+
+# Load the data from the CSV file
+data <- read.csv("~/Uni/MA Journalism/Learn R/1.Detail Landlord Violations.xlsx - Sheet 1.csv")
+
+# Clean up the 'VIOLATION.ADDRESS' column
+data$`VIOLATION.ADDRESS` <- trimws(tolower(data$`VIOLATION.ADDRESS`))  # Remove spaces and make lowercase
+
+# Count how many times '3003 VAN NESS ST NW' appears in the 'VIOLATION.ADDRESS' column (case-insensitive)
+count_violations <- data %>%
+  filter(`VIOLATION.ADDRESS` == tolower(trimws("3003 VAN NESS ST NW"))) %>%
+  nrow()
+
+# Print the result
+print(count_violations)
+
+```
+```{r}
+# Load necessary libraries
+library(dplyr)
+
+# Load the data from the CSV file
+data <- read.csv("~/Uni/MA Journalism/Learn R/1.Detail Landlord Violations.xlsx - Sheet 1.csv")
+
+# Clean up the 'OWNER' column (remove extra spaces and convert to lowercase)
+data$OWNER <- trimws(tolower(data$OWNER))
+
+# Count how many times 'SMITH PROPERTY HOLDINGS VAN NESS L.P.' appears in the 'OWNER' column
+count_owner <- data %>%
+  filter(OWNER == tolower(trimws("SMITH PROPERTY HOLDINGS VAN NESS L.P."))) %>%
+  nrow()
+
+# Print the result
+print(count_owner)
+
+```
+```{r}
+# Load necessary libraries
+library(dplyr)
+
+# Load the data from the CSV file
+data <- read.csv("~/Uni/MA Journalism/Learn R/1.Detail Landlord Violations.xlsx - Sheet 1.csv")
+
+# Clean up the 'VIOLATION.ADDRESS' column (remove spaces and convert to lowercase)
+data$`VIOLATION.ADDRESS` <- trimws(tolower(data$`VIOLATION.ADDRESS`))
+
+# Clean up the 'ORIGINAL.FINE.AMOUNT' column (ensure it's numeric, removing any non-numeric characters if needed)
+data$`ORIGINAL.FINE.AMOUNT` <- as.numeric(gsub("[^0-9.-]", "", data$`ORIGINAL.FINE.AMOUNT`))
+
+# Calculate the total 'ORIGINAL.FINE.AMOUNT' for '3003 VAN NESS ST NW'
+total_fine <- data %>%
+  filter(`VIOLATION.ADDRESS` == tolower(trimws("3003 VAN NESS ST NW"))) %>%
+  summarise(total_fine = sum(`ORIGINAL.FINE.AMOUNT`, na.rm = TRUE))
+
+# Print the result
+print(total_fine)
+
+```
+  #Post Aarushi feedback!! 
+```{r}
+# Load necessary libraries
+
+library(dplyr)
+
+library(lubridate)
+
+ 
+
+# Read the CSV file into a data frame
+
+violations_data <- read.csv("~/Uni/MA Journalism/Learn R/1.Detail Landlord Violations.xlsx - Sheet 1.csv")
+
+ 
+
+# Convert 'CREATED DATE' column to Date type - fix the format
+
+violations_data$CREATED.DATE <- mdy(violations_data$CREATED.DATE)  # Use mdy() for MM/DD/YYYY format
+
+ 
+
+# Filter for all available data for 3003 Van Ness St NW
+
+van_ness_violations <- violations_data %>%
+
+  filter(`VIOLATION.ADDRESS` == "3003 VAN NESS ST NW")
+
+ 
+
+# Count the number of violations
+
+violation_count <- nrow(van_ness_violations)
+
+ 
+
+# Calculate total fine amount (after converting from string to numeric)
+
+van_ness_violations$FINE_AMOUNT <- as.numeric(gsub("[$,]", "", van_ness_violations$ORIGINAL.FINE.AMOUNT))
+
+total_fines <- sum(van_ness_violations$FINE_AMOUNT, na.rm = TRUE)
+
+ 
+
+# Output the result
+
+print(paste("Number of violations at 3003 VAN NESS ST NW in the available data:", violation_count))
+
+print(paste("Total fine amount: $", format(total_fines, big.mark=",")))
+
+ 
+
+# For Jan 15, 2025 cutoff
+
+jan_15_violations <- van_ness_violations %>%
+
+  filter(CREATED.DATE <= as.Date("2025-01-15"))
+
+jan_15_count <- nrow(jan_15_violations)
+
+jan_15_fines <- sum(jan_15_violations$FINE_AMOUNT, na.rm = TRUE)
+
+ 
+
+print(paste("Violations until Jan 15, 2025:", jan_15_count))
+
+print(paste("Fine amount until Jan 15, 2025: $", format(jan_15_fines, big.mark=",")))
+
+```
+```
+That did work! Will now try and find total fine amount, equivalent to the $40 million figure in the original story.
+```{r}
+total_fines <- sum(van_ness_violations$FINE_AMOUNT, na.rm = TRUE)
+print(paste("Total fine amount: $", format(total_fines, big.mark = ",")))
+
+```
+
+```{r}
+# Clean 'ORIGINAL.FINE.AMOUNT' by removing $ and commas
+violations_data$ORIGINAL.FINE.AMOUNT <- as.numeric(gsub("[$,]", "", violations_data$ORIGINAL.FINE.AMOUNT))
+
+# Calculate the total fine amount
+total_fines <- sum(violations_data$ORIGINAL.FINE.AMOUNT, na.rm = TRUE)
+
+# Output the result
+print(paste("Total fine amount: $", format(total_fines, big.mark = ",")))
+
+```
+For some reason it is now not outputting up here as it won't let me press play? But the answer from the console is $8,410,288
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(ggplot2)
+
+# Clean 'ORIGINAL.FINE.AMOUNT' column by removing $ and commas
+violations_data$ORIGINAL.FINE.AMOUNT <- as.numeric(gsub("[$,]", "", violations_data$ORIGINAL.FINE.AMOUNT))
+
+# Summarize the data by OWNER and sum the 'ORIGINAL.FINE.AMOUNT'
+owner_fines <- violations_data %>%
+  group_by(OWNER) %>%
+  summarize(total_fines = sum(ORIGINAL.FINE.AMOUNT, na.rm = TRUE)) %>%
+  arrange(desc(total_fines))
+
+# Get the top 10 owners with the highest fines (you can adjust the number of top owners here)
+top_owners <- head(owner_fines, 10)
+
+# Create a bar chart using ggplot2
+ggplot(top_owners, aes(x = reorder(OWNER, total_fines), y = total_fines, fill = OWNER)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +  # Flip coordinates to make the bars horizontal
+  labs(
+    title = "Top 10 Owners by Total Fine Amount",
+    x = "Owner",
+    y = "Total Fine Amount ($)"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels if needed
+
+```
+```{r}
+# Create a bar chart using ggplot2 with larger bars and no legend
+ggplot(top_owners, aes(x = reorder(OWNER, total_fines), y = total_fines)) +
+  geom_bar(stat = "identity", fill = "steelblue", width = 0.8) +  # Increased bar size with width
+  coord_flip() +  # Flip coordinates to make the bars horizontal
+  labs(
+    title = "Top 10 Owners by Total Fine Amount",
+    x = "Owner",
+    y = "Total Fine Amount ($)"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate x-axis labels for readability
+    legend.position = "none",  # Remove the legend
+    axis.title.x = element_text(size = 14),  # Increase size of axis titles
+    axis.title.y = element_text(size = 14),  # Increase size of axis titles
+    plot.title = element_text(size = 16, face = "bold")  # Increase size of plot title
+  )
+
+```
+
+Adding labels with the amounts - this is also less readable because the top one I think is the NA column, which if I was writing a story on it I would want to dig further into that data. 
+```{r}
+# Create a bar chart using ggplot2 with larger bars, no legend, and labels
+ggplot(top_owners, aes(x = reorder(OWNER, total_fines), y = total_fines)) +
+  geom_bar(stat = "identity", fill = "steelblue", width = 0.8) +  # Increased bar size
+  geom_text(aes(label = scales::dollar(total_fines)), hjust = -0.1, size = 5) +  # Add labels with total fine amount
+  coord_flip() +  # Flip coordinates to make the bars horizontal
+  labs(
+    title = "Top 10 Owners by Total Fine Amount",
+    x = "Owner",
+    y = "Total Fine Amount ($)"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate x-axis labels for readability
+    legend.position = "none",  # Remove the legend
+    axis.title.x = element_text(size = 14),  # Increase size of axis titles
+    axis.title.y = element_text(size = 14),  # Increase size of axis titles
+    plot.title = element_text(size = 16, face = "bold")  # Increase size of plot title
+  )
+
+```
