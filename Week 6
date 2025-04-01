@@ -1,1 +1,199 @@
+---
+title: "HW-week-6"
+author: "Hannah Campbell"
+date: "2025-02-21"
+output: html_document
+---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+# Load necessary libraries
+library(readr)   # for reading the CSV file
+library(dplyr)   # for data manipulation
+library(lubridate) # for date manipulation, if necessary
+library(ggplot2) # for basic data visualization
+
+# Load the data from the CSV file
+file_path <- "1.Detail Landlord Violations.xlsx - Sheet 1.csv"
+data <- read_csv(file_path)
+
+# View the first few rows of the dataset to understand its structure
+head(data)
+
+# Check the structure of the data (e.g., column types)
+str(data)
+
+# Convert 'CREATED DATE' to Date format if necessary
+data$`CREATED DATE` <- mdy(data$`CREATED DATE`)
+
+# Perform a basic summary of the numeric columns (e.g., 'ORIGINAL FINE AMOUNT')
+summary(data$`ORIGINAL FINE AMOUNT`)
+
+
+# Check for missing values in the dataset
+missing_values <- colSums(is.na(data))
+print(missing_values)
+
+# Basic analysis: Number of violations per owner
+violations_per_owner <- data %>%
+  group_by(OWNER) %>%
+  summarize(violations_count = n()) %>%
+  arrange(desc(violations_count))
+
+# Print the top 10 owners with the most violations
+head(violations_per_owner, 10)
+
+# Basic analysis: Total fines by violation type
+total_fines_by_violation <- data %>%
+  group_by(VIOLATION) %>%
+  summarize(total_fines = sum(`ORIGINAL FINE AMOUNT`, na.rm = TRUE)) %>%
+  arrange(desc(total_fines))
+
+# Print the top 10 violations with the highest total fines
+head(total_fines_by_violation, 10)
+
+# Visualize the distribution of original fine amounts
+ggplot(data, aes(x = `ORIGINAL FINE AMOUNT`)) +
+  geom_histogram(binwidth = 50, fill = "blue", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of Original Fine Amounts", x = "Original Fine Amount", y = "Count")
+
+# Visualize the number of violations by owner
+ggplot(violations_per_owner, aes(x = reorder(OWNER, violations_count), y = violations_count)) +
+  geom_bar(stat = "identity", fill = "tomato", color = "black") +
+  labs(title = "Number of Violations by Owner", x = "Owner", y = "Number of Violations") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+#I then asked it to fix the error so it gave me the below code
+```{r}
+# Convert 'ORIGINAL FINE AMOUNT' to numeric, coercing errors to NA (in case there are non-numeric values)
+data$`ORIGINAL FINE AMOUNT` <- as.numeric(gsub("[^0-9.-]", "", data$`ORIGINAL FINE AMOUNT`))
+
+# Check if the conversion was successful
+summary(data$`ORIGINAL FINE AMOUNT`)
+
+# Perform the analysis again: Total fines by violation type
+total_fines_by_violation <- data %>%
+  group_by(VIOLATION) %>%
+  summarize(total_fines = sum(`ORIGINAL FINE AMOUNT`, na.rm = TRUE)) %>%
+  arrange(desc(total_fines))
+
+# Print the top 10 violations with the highest total fines
+head(total_fines_by_violation, 10)
+
+```
+#The top violations are NA - would want to look further into this if I was writing a story on it. After that it is DISTRICT OF COLUMBIA HOUSING AUTHORITY with	110
+#I have instead tried to find which address has the most violations - using the below code.
+```{r}
+# Count the number of violations per "VIOLATION ADDRESS"
+violations_per_address <- data %>%
+group_by(`VIOLATION ADDRESS`) %>%
+  summarize(violations_count = n()) %>%
+  arrange(desc(violations_count))
+
+# Print the address with the most violations and the count
+top_address <- head(violations_per_address, 1)
+print(top_address)
+
+```
+#I am now trying for the top 10 addresses
+```{r}
+# Count the number of violations per "VIOLATION ADDRESS"
+violations_per_address <- data %>%
+  group_by(`VIOLATION ADDRESS`) %>%
+  summarize(violations_count = n()) %>%
+  arrange(desc(violations_count))
+
+# Print the top 10 addresses with the most violations
+top_10_addresses <- head(violations_per_address, 10)
+print(top_10_addresses)
+
+```
+#These may be addresses to visit to see if anyone would talk for a possible story
+#I am now going to try and do the bar chart task.
+```{r}
+# Summarize total fines by violation type
+total_fines_by_violation <- data %>%
+  group_by(VIOLATION) %>%
+  summarize(total_fines = sum(`ORIGINAL FINE AMOUNT`, na.rm = TRUE)) %>%
+  arrange(desc(total_fines))
+
+# Get the top 10 violations by total fine amount
+top_10_violations <- head(total_fines_by_violation, 10)
+
+# Create a bar chart using ggplot2
+library(ggplot2)
+
+ggplot(top_10_violations, aes(x = reorder(VIOLATION, total_fines), y = total_fines)) +
+  geom_bar(stat = "identity", fill = "steelblue", color = "black") +
+  labs(title = "Top 10 Violations by Total Fine Amount",
+       x = "Violation",
+       y = "Total Fine Amount") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) # Rotate x-axis labels for readability
+
+```
+#The bar chart hasn't displayed properly so I am trying again 
+```{r}
+# Clean and convert the 'ORIGINAL FINE AMOUNT' to numeric
+data$`ORIGINAL FINE AMOUNT` <- as.numeric(gsub("[^0-9.-]", "", data$`ORIGINAL FINE AMOUNT`))
+
+# Summarize total fines by violation type
+total_fines_by_violation <- data %>%
+  group_by(VIOLATION) %>%
+  summarize(total_fines = sum(`ORIGINAL FINE AMOUNT`, na.rm = TRUE)) %>%
+  arrange(desc(total_fines))
+
+# Get the top 10 violations by total fine amount
+top_10_violations <- head(total_fines_by_violation, 10)
+
+# Create a bar chart using ggplot2
+library(ggplot2)
+
+ggplot(top_10_violations, aes(x = reorder(VIOLATION, total_fines), y = total_fines)) +
+  geom_bar(stat = "identity", fill = "steelblue", color = "black") +
+  labs(title = "Top 10 Violations by Total Fine Amount",
+       x = "Violation",
+       y = "Total Fine Amount") +
+theme(axis.text.x = element_text(angle = 45, hjust = 1)) # Rotate x-axis labels for reada
+# Clean and convert 'ORIGINAL FINE AMOUNT' to numeric
+data$`ORIGINAL FINE AMOUNT` <- as.numeric(gsub("[^0-9.-]", "", data$`ORIGINAL FINE AMOUNT`))
+
+# Count the number of properties (rows) that received each unique fine amount
+fine_amount_distribution <- data %>%
+  group_by(`ORIGINAL FINE AMOUNT`) %>%
+  summarize(properties_count = n()) %>%
+  arrange(desc(properties_count))
+
+# Create a bar chart using ggplot2
+library(ggplot2)
+
+ggplot(fine_amount_distribution, aes(x = as.factor(`ORIGINAL FINE AMOUNT`), y = properties_count)) +
+  geom_bar(stat = "identity", fill = "darkorange", color = "black") +
+  labs(title = "Distribution of Fines by Original Fine Amount",
+       x = "Original Fine Amount",
+       y = "Number of Properties") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) # Rotate x-axis labels for readability
+
+```
