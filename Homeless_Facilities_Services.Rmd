@@ -1,0 +1,127 @@
+---
+title: "Week 8 HW"
+output: html_document
+date: "2025-04-14"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+# Step 1: Load necessary packages (optional)
+# install.packages("readr")  # Uncomment if you haven't installed readr
+library(readr)
+
+# Step 2: Read the CSV file
+data <- read_csv("Homeless_Service_Facilities.csv")
+
+# Step 3: Check the structure of the data (optional, to verify column names)
+str(data)
+
+# Step 4: Count how many facilities have "Yes" in the CASE_MANAGEMENT column
+case_management_yes <- sum(data$CASE_MANAGEMENT == "Yes", na.rm = TRUE)
+
+# Step 5: Print the result
+cat("Number of facilities with case management service:", case_management_yes, "\n")
+
+```
+```{r}
+# Step 1: Filter rows where CASE_MANAGEMENT is "Yes"
+case_mgmt_facilities <- data[data$CASE_MANAGEMENT == "Yes", ]
+
+# Step 2: Display facility names
+case_mgmt_facilities$PROGRAM_NAME
+```
+```{r}
+# Filter for facilities with CASE_MANAGEMENT == "Yes" and no NAs
+case_mgmt_facilities <- data[data$CASE_MANAGEMENT == "Yes" & !is.na(data$PROGRAM_NAME, ]
+
+# Display the facility names
+case_mgmt_names <- unique(case_mgmt_facilities$PROGRAM_NAME)
+print(case_mgmt_names)
+```
+```{r}
+# Filter for facilities with CASE_MANAGEMENT == "Yes" and remove NA values in both columns
+case_mgmt_facilities <- data[!is.na(data$CASE_MANAGEMENT) & 
+                             data$CASE_MANAGEMENT == "Yes" & 
+                             !is.na(data$PROGRAM_NAME), ]
+
+# Get unique facility names
+case_mgmt_names <- unique(case_mgmt_facilities$PROGRAM_NAME)
+
+# Print the list
+print(case_mgmt_names)
+```
+```{r}
+View(case_mgmt_facilities)
+```
+
+setwd("DataJournalism/Week 8/)
+library(tidyverse)
+library (dplyr)
+
+(r)
+Homeless_Service_Facilities <- read.cvs("Data Journalism/Week 8/Homeless_Service_Facilities.csv)
+
+#Using datacenters guide from week 8 to try and do it myself rather than using chatgpt from the start
+compliance <- Homeless_Service_Facilities %>%
+  count(SERVICES, sort = TRUE) %>%
+  rename(Count = n)
+  
+```{r}
+# Count facilities with Domestic Violence Services = "Yes"
+sum(data$DOMESTIC_VIOLENCE_SERVICES == "Yes", na.rm = TRUE)
+```
+```{r}
+# Filter rows with Domestic Violence Services == "Yes" and no NA in PROGRAM_NAME
+dv_services <- data[!is.na(data$DOMESTIC_VIOLENCE_SERVICES) &
+                    data$DOMESTIC_VIOLENCE_SERVICES == "Yes" &
+                    !is.na(data$PROGRAM_NAME), ]
+
+# Get unique program names
+dv_program_names <- unique(dv_services$PROGRAM_NAME)
+
+# Print the list
+print(dv_program_names)
+
+```
+```{r}
+sum(data$HOUSING_NAVIGATION == "Yes", na.rm = TRUE)
+```
+```{r}
+# Filter the rows with Housing Navigation == "Yes" and non-missing PROGRAM_NAME
+housing_nav <- data[!is.na(data$HOUSING_NAVIGATION) &
+                    data$HOUSING_NAVIGATION == "Yes" &
+                    !is.na(data$PROGRAM_NAME), ]
+
+# Get unique program names
+housing_nav_programs <- unique(housing_nav$PROGRAM_NAME)
+
+# Print the list
+print(housing_nav_programs)
+```
+```{r}
+```
+  
+  
